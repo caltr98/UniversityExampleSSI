@@ -1,0 +1,33 @@
+{
+  "name": "university-example-ssi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runnable Sepolia did:ethr Self-Sovereign Identity example for students.",
+  "scripts": {
+    "start": "node --loader ts-node/esm example.ts",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@veramo/core": "^6.0.0",
+    "@veramo/core-types": "^6.0.0",
+    "@veramo/credential-w3c": "^6.0.0",
+    "@veramo/data-store": "^6.0.0",
+    "@veramo/did-manager": "^6.0.0",
+    "@veramo/did-provider-ethr": "^6.0.0",
+    "@veramo/did-resolver": "^6.0.0",
+    "@veramo/key-manager": "^6.0.0",
+    "@veramo/kms-local": "^6.0.0",
+    "did-resolver": "^4.1.0",
+    "ethr-did-resolver": "^11.0.4",
+    "reflect-metadata": "^0.2.2",
+    "sqlite3": "^5.1.7",
+    "typeorm": "^0.3.25"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.4"
+  },
+  "type": "module"
+}
