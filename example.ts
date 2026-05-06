@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { inspect } from 'node:util'
 import {
   CredentialPayload,
   IIdentifier,
@@ -8,82 +8,20 @@ import {
 } from '@veramo/core-types'
 import { agent, SEPOLIA_DID_PROVIDER } from './src/setup.js'
 
-type DegreeClaims = {
-  id: string
-  fullName: string
-  birthDate: string
-  birthPlace: string
-  enrollmentDate: string
-  academicYear: string
-  degreeName: string
-  curriculum: string
-  degreeClass: string
-  normalDuration: string
-  graduationDate: string
-  finalGrade: string
-  diplomaIssueDate: string
-}
-
-type RecruiterRequirement = {
-  role: string
-  acceptedDegreeClass: string
-  acceptedDegreeKeyword: string
-  graduationDateMustBeOnOrBefore: string
-  claimsRequested: Array<keyof DegreeClaims>
-  claimsNotRequested: Array<keyof DegreeClaims>
-  privatePredicateRequested: string
-}
-
-type SelectiveDisclosureApplication = {
-  holder: string
-  verifier: string
-  role: string
-  revealedClaims: Pick<DegreeClaims, 'id' | 'fullName' | 'degreeName' | 'degreeClass' | 'graduationDate'>
-  hiddenClaims: Array<keyof DegreeClaims>
-  hiddenClaimsCommitment: string
-  sourceCredentialHash: string
-}
-
-type SelectiveDisclosureCheck = {
-  onlyRequestedClaimsRevealed: boolean
-  degreeClassAccepted: boolean
-  degreeNameAccepted: boolean
-  graduationDateAccepted: boolean
-  verifierCanDecide: boolean
-}
-
-type EducationalZkPredicateProof = {
-  holder: string
-  verifier: string
-  publicStatement: string
-  publicResult: boolean
-  hiddenInputs: Array<keyof DegreeClaims>
-  hiddenInputCommitment: string
-  concretePrivateWitnessUsedByDemo: Pick<DegreeClaims, 'finalGrade'>
-  verifierLearns: string
-  warning: string
-}
-
-type EducationalZkPredicateCheck = {
-  predicateAccepted: boolean
-  finalGradeWasNotRevealedInSelectiveDisclosure: boolean
-  verifierAccepts: boolean
-}
-
-type JwtVpPayload = {
+type JwtPayloadWithVp = {
   vp?: {
     verifiableCredential?: W3CVerifiableCredential[]
   }
 }
 
-async function getOrCreateDid(veramo: typeof agent, alias: string): Promise<IIdentifier> {
+async function getOrCreateDid(veramoAgent: typeof agent, alias: string): Promise<IIdentifier> {
   try {
-    return await veramo.didManagerGetByAlias({
+    return await veramoAgent.didManagerGetByAlias({
       alias,
       provider: SEPOLIA_DID_PROVIDER,
     })
   } catch {
-    return await veramo.didManagerCreate({
+    return await veramoAgent.didManagerCreate({
       alias,
       provider: SEPOLIA_DID_PROVIDER,
       kms: 'local',
@@ -91,18 +29,45 @@ async function getOrCreateDid(veramo: typeof agent, alias: string): Promise<IIde
   }
 }
 
+function printFull(label: string, value: unknown): void {
+  console.log(`\n--- ${label} ---`)
+  console.log(
+    inspect(value, {
+      depth: null,
+      colors: true,
+      compact: false,
+      breakLength: 120,
+      maxArrayLength: null,
+      maxStringLength: null,
+    }),
+  )
+}
+
+function decodeJwt(jwt: string): unknown {
+  const [, payload] = jwt.split('.')
+
+  if (!payload) {
+    throw new Error('Invalid JWT: missing payload')
+  }
+
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+}
+
+function printFullCredentialOrPresentation(label: string, value: unknown): void {
+  printFull(`${label} raw`, value)
+
+  if (typeof value === 'string') {
+    printFull(`${label} decoded JWT payload`, decodeJwt(value))
+  }
+}
+
 function extractEmbeddedCredentials(vp: W3CVerifiablePresentation): W3CVerifiableCredential[] {
   if (typeof vp === 'string') {
-    const [, payload] = vp.split('.')
-    const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as JwtVpPayload
+    const decodedPayload = decodeJwt(vp) as JwtPayloadWithVp
     return decodedPayload.vp?.verifiableCredential ?? []
   }
 
   return vp.verifiableCredential ?? []
-}
-
-function sha256(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
 async function main(): Promise<void> {
@@ -121,45 +86,46 @@ async function main(): Promise<void> {
   ])
 
   console.log('\nB. Payload: claims about Alice Degree')
-  const degreeClaims: DegreeClaims = {
-    id: alice.did,
-    fullName: 'Alice Rossi',
-    birthDate: '2002-10-28',
-    birthPlace: 'Lucca (LU), Italy',
-    enrollmentDate: '2024-07-28',
-    academicYear: '2024/2025',
-    degreeName: 'Laurea Magistrale in Informatica',
-    curriculum: 'ICT - ICT Solutions Architect',
-    degreeClass: 'LM-18',
-    normalDuration: '2 years',
-    graduationDate: '2026-10-11',
-    finalGrade: '110/110 e lode',
-    diplomaIssueDate: '2026-10-11',
-  }
-
   const degreeCredentialPayload: CredentialPayload = {
     '@context': ['https://www.w3.org/2018/credentials/v1'],
     type: ['VerifiableCredential', 'UniversityDegreeCredential'],
     issuer: { id: university.did },
     issuanceDate: new Date().toISOString(),
-    credentialSubject: degreeClaims,
+    credentialSubject: {
+      id: alice.did,
+      fullName: 'Alice Rossi',
+      birthDate: '2002-10-28',
+      birthPlace: 'Lucca (LU), Italy',
+      enrollmentDate: '2024-07-28',
+      academicYear: '2024/2025',
+      degreeName: 'Laurea Magistrale in Informatica',
+      curriculum: 'ICT - ICT Solutions Architect',
+      degreeClass: 'LM-18',
+      normalDuration: '2 years',
+      graduationDate: '2026-10-11',
+      finalGrade: '110/110 e lode',
+      diplomaIssueDate: '2026-10-11',
+    },
   }
-  console.log(degreeCredentialPayload)
+
+  printFull('Degree Credential Payload', degreeCredentialPayload)
 
   console.log('\nC. Issue VC: sign as JWT')
   const degreeVC: W3CVerifiableCredential = await agent.createVerifiableCredential({
     credential: degreeCredentialPayload,
     proofFormat: 'jwt',
   })
-  console.log('\n--- Degree VC with JWT ---')
-  console.log(degreeVC)
+
+  printFullCredentialOrPresentation('Degree VC with JWT', degreeVC)
 
   console.log('\nD. Store VC: Alice stores Degree VC')
   const storedVcHash = await agent.dataStoreSaveVerifiableCredential({
     verifiableCredential: degreeVC,
   })
-  console.log('\n--- Stored VC ---')
-  console.log('Stored VC hash:', storedVcHash)
+
+  printFull('Stored VC', {
+    storedVcHash,
+  })
 
   console.log('\nE. Create VP: Alice generates VP embedding the Degree VC')
   const degreePresentationPayload: PresentationPayload = {
@@ -169,137 +135,38 @@ async function main(): Promise<void> {
     verifiableCredential: [degreeVC],
   }
 
+  printFull('Degree Presentation Payload', degreePresentationPayload)
+
   const degreeVP: W3CVerifiablePresentation = await agent.createVerifiablePresentation({
     presentation: degreePresentationPayload,
     proofFormat: 'jwt',
   })
-  console.log('\n--- Degree VP with embedded VC ---')
-  console.log(degreeVP)
 
-  console.log('\nF. Verify VP: recruiter checks the presentation')
+  printFullCredentialOrPresentation('Degree VP with embedded VC', degreeVP)
+
+  console.log('\nF. Verify VP: recruiter checks VP')
   const vpVerificationResult = await agent.verifyPresentation({
     presentation: degreeVP,
   })
-  console.log('\n--- VP Verification result ---')
+
+  printFull('VP Verification result', vpVerificationResult)
   console.log('Verified:', vpVerificationResult.verified)
 
-  console.log('\nF. Verify VC: recruiter checks every VC embedded in the VP')
+  console.log('\nG. Verify VC: recruiter checks every VC embedded in the VP')
   const embeddedCredentials = extractEmbeddedCredentials(degreeVP)
+
+  printFull('Embedded Credentials extracted from VP', embeddedCredentials)
+
   for (const [index, embeddedCredential] of embeddedCredentials.entries()) {
+    printFullCredentialOrPresentation(`Embedded VC ${index + 1}`, embeddedCredential)
+
     const vcVerificationResult = await agent.verifyCredential({
       credential: embeddedCredential,
     })
+
+    printFull(`Embedded VC ${index + 1} verification result`, vcVerificationResult)
     console.log(`Embedded VC ${index + 1} verified:`, vcVerificationResult.verified)
   }
-
-  console.log('\nG. Privacy preserving continuation: selective disclosure and ZKP-style proof')
-  console.log('This JWT example is didactic: real selective disclosure/ZKP needs formats such as SD-JWT VC, BBS+, or AnonCreds.')
-
-  const recruiterRequirement: RecruiterRequirement = {
-    role: 'Junior Blockchain / SSI Engineer',
-    acceptedDegreeClass: 'LM-18',
-    acceptedDegreeKeyword: 'Informatica',
-    graduationDateMustBeOnOrBefore: '2026-12-31',
-    claimsRequested: ['id', 'fullName', 'degreeName', 'degreeClass', 'graduationDate'],
-    claimsNotRequested: [
-      'birthDate',
-      'birthPlace',
-      'enrollmentDate',
-      'academicYear',
-      'curriculum',
-      'normalDuration',
-      'finalGrade',
-      'diplomaIssueDate',
-    ],
-    privatePredicateRequested: 'Prove finalGrade is at least 100/110 without revealing finalGrade.',
-  }
-
-  console.log('\n--- Concrete recruiter requirement ---')
-  console.log(recruiterRequirement)
-
-  const hiddenClaims: Array<keyof DegreeClaims> = [
-    'birthDate',
-    'birthPlace',
-    'enrollmentDate',
-    'academicYear',
-    'curriculum',
-    'normalDuration',
-    'finalGrade',
-    'diplomaIssueDate',
-  ]
-
-  const selectiveDisclosureApplication: SelectiveDisclosureApplication = {
-    holder: alice.did,
-    verifier: jobRecruiter.did,
-    role: recruiterRequirement.role,
-    revealedClaims: {
-      id: degreeClaims.id,
-      fullName: degreeClaims.fullName,
-      degreeName: degreeClaims.degreeName,
-      degreeClass: degreeClaims.degreeClass,
-      graduationDate: degreeClaims.graduationDate,
-    },
-    hiddenClaims,
-    hiddenClaimsCommitment: sha256(
-      Object.fromEntries(hiddenClaims.map((claim) => [claim, degreeClaims[claim]])),
-    ),
-    sourceCredentialHash: sha256(degreeVC),
-  }
-
-  console.log('\n--- Selective disclosure job application sent to recruiter ---')
-  console.log(selectiveDisclosureApplication)
-
-  const selectiveDisclosureCheck: SelectiveDisclosureCheck = {
-    onlyRequestedClaimsRevealed: Object.keys(selectiveDisclosureApplication.revealedClaims).every((claim) =>
-      recruiterRequirement.claimsRequested.includes(claim as keyof DegreeClaims),
-    ),
-    degreeClassAccepted:
-      selectiveDisclosureApplication.revealedClaims.degreeClass === recruiterRequirement.acceptedDegreeClass,
-    degreeNameAccepted: selectiveDisclosureApplication.revealedClaims.degreeName.includes(
-      recruiterRequirement.acceptedDegreeKeyword,
-    ),
-    graduationDateAccepted:
-      selectiveDisclosureApplication.revealedClaims.graduationDate <= recruiterRequirement.graduationDateMustBeOnOrBefore,
-    verifierCanDecide: false,
-  }
-  selectiveDisclosureCheck.verifierCanDecide =
-    selectiveDisclosureCheck.onlyRequestedClaimsRevealed &&
-    selectiveDisclosureCheck.degreeClassAccepted &&
-    selectiveDisclosureCheck.degreeNameAccepted &&
-    selectiveDisclosureCheck.graduationDateAccepted
-
-  console.log('\n--- Recruiter checks selective disclosure packet ---')
-  console.log(selectiveDisclosureCheck)
-
-  const finalGradeNumber = Number.parseInt(degreeClaims.finalGrade, 10)
-  const gradeThreshold = 100
-  const gradePredicateAccepted = finalGradeNumber >= gradeThreshold
-
-  const gradePredicateProof: EducationalZkPredicateProof = {
-    holder: alice.did,
-    verifier: jobRecruiter.did,
-    publicStatement: `Alice's final grade is at least ${gradeThreshold}/110.`,
-    publicResult: gradePredicateAccepted,
-    hiddenInputs: ['finalGrade'],
-    hiddenInputCommitment: sha256({ finalGrade: degreeClaims.finalGrade, nonce: 'lecture-demo-nonce' }),
-    concretePrivateWitnessUsedByDemo: { finalGrade: degreeClaims.finalGrade },
-    verifierLearns: `Only the boolean result: ${gradePredicateAccepted}. The exact finalGrade is not in the selective disclosure packet.`,
-    warning: 'Teaching mock only: this hash is a commitment, not a real zero-knowledge proof.',
-  }
-
-  const gradePredicateCheck: EducationalZkPredicateCheck = {
-    predicateAccepted: gradePredicateProof.publicResult,
-    finalGradeWasNotRevealedInSelectiveDisclosure: !Object.hasOwn(selectiveDisclosureApplication.revealedClaims, 'finalGrade'),
-    verifierAccepts: false,
-  }
-  gradePredicateCheck.verifierAccepts =
-    gradePredicateCheck.predicateAccepted && gradePredicateCheck.finalGradeWasNotRevealedInSelectiveDisclosure
-
-  console.log('\n--- Zero-knowledge predicate proof example ---')
-  console.log(gradePredicateProof)
-
-  console.log('\n--- Recruiter checks ZKP-style predicate result ---')
-  console.log(gradePredicateCheck)
 }
 
 main().catch((error) => {

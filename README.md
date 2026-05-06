@@ -259,7 +259,7 @@ E. Create VP: Alice generates VP embedding the Degree VC
 F. Verify: recruiter checks VP
 Verified: true
 Embedded VC 1 verified: true
-G. Privacy preserving continuation: selective disclosure and ZKP-style proof
+G. Privacy preserving continuation: selective disclosure
 ```
 
 The DID values will be different on each machine.
@@ -306,9 +306,9 @@ Then run again:
 npm run start
 ```
 
-## G. Selective Disclosure And Zero-Knowledge Proofs
+## G. Selective Disclosure
 
-The root `example.ts` keeps the same lecture flow and ends with a small educational privacy continuation.
+The root `example.ts` keeps the same lecture flow and ends with a small educational selective disclosure continuation.
 
 It does not use a Veramo selective disclosure plugin. It shows the idea with plain TypeScript objects so students can understand the concept first.
 
@@ -379,37 +379,7 @@ The code prints this concrete check:
 }
 ```
 
-### Teaching Zero-Knowledge Predicate
-
-The recruiter asks:
-
-```text
-Prove finalGrade is at least 100/110 without revealing finalGrade.
-```
-
-Alice's hidden value is:
-
-```text
-finalGrade = 110/110 e lode
-```
-
-The recruiter learns only:
-
-```ts
-publicResult: true
-```
-
-The code prints:
-
-```ts
-{
-  predicateAccepted: true,
-  finalGradeWasNotRevealedInSelectiveDisclosure: true,
-  verifierAccepts: true,
-}
-```
-
-Important: this root example is a teaching mock. Real selective disclosure is in `selective-disclosure/`, and production zero-knowledge proof systems require real cryptographic protocols.
+Important: this root example is a teaching mock. Real selective disclosure is in `selective-disclosure/`.
 
 ## Real Veramo Selective Disclosure Plugin Example
 
