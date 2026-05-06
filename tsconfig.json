@@ -8,7 +8,13 @@
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "dist",
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["example.ts", "src/**/*.ts"]
+  "include": [
+    "example.ts",
+    "src/**/*.ts",
+    "selective-disclosure/**/*.ts"
+  ]
 }

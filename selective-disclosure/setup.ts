@@ -9,8 +9,10 @@ import {
 } from '@veramo/core'
 import { IDIDManager } from '@veramo/core-types'
 import { CredentialPlugin } from '@veramo/credential-w3c'
+import { ISelectiveDisclosure, SelectiveDisclosure } from '@veramo/selective-disclosure'
 import {
   DataStore,
+  DataStoreORM,
   DIDStore,
   Entities,
   IDataStoreORM,
@@ -30,24 +32,23 @@ import { DataSource } from 'typeorm'
 export const SEPOLIA_DID_PROVIDER = 'did:ethr:sepolia'
 export const ETHR_DID_REGISTRY = '0x03d5003bf0e79C5F5223588F347ebA39AfbC3818'
 
-export type VeramoAgent = IDIDManager &
+export type SelectiveDisclosureAgent = IDIDManager &
   IKeyManager &
   IDataStore &
   IDataStoreORM &
   IResolver &
-  ICredentialPlugin
+  ICredentialPlugin &
+  ISelectiveDisclosure
 
-const DATABASE_FILE = process.env.VERAMO_DB_UNIVERSITY ?? 'database.sqlite'
-// In the lecture slides this is generated with:
-// export KMS_SECRET_KEY="$(npx @veramo/cli config create-secret-key)"
+const DATABASE_FILE = process.env.VERAMO_DB_SELECTIVE_DISCLOSURE ?? 'selective-disclosure.sqlite'
 const KMS_SECRET_KEY =
   process.env.KMS_SECRET_KEY ??
   process.env.VERAMO_KMS_SECRET_KEY ??
   'f1baa0637294cbe40f68c8f2c16cc2a96982db8dde5a5a4b4f485f0ca2272069'
 
-export const agent = createUniversityAgent()
+export const agent = createSelectiveDisclosureAgent()
 
-export function createUniversityAgent() {
+export function createSelectiveDisclosureAgent() {
   const rpcUrl = getSepoliaRpcUrl()
 
   const dbConnection = new DataSource({
@@ -70,7 +71,7 @@ export function createUniversityAgent() {
     ],
   })
 
-  return createAgent<VeramoAgent>({
+  return createAgent<SelectiveDisclosureAgent>({
     plugins: [
       new KeyManager({
         store: new KeyStore(dbConnection),
@@ -91,12 +92,12 @@ export function createUniversityAgent() {
         },
       }),
       new DIDResolverPlugin({
-        // ethr-did-resolver and did-resolver can be installed through different transitive paths.
-        // The resolver registry shape is compatible at runtime, but TypeScript sees distinct copies.
         resolver: new Resolver(ethrResolverAlchemy as ConstructorParameters<typeof Resolver>[0]),
       }),
       new CredentialPlugin(),
+      new SelectiveDisclosure(),
       new DataStore(dbConnection),
+      new DataStoreORM(dbConnection),
     ],
   })
 }

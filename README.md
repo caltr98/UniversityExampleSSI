@@ -259,6 +259,7 @@ E. Create VP: Alice generates VP embedding the Degree VC
 F. Verify: recruiter checks VP
 Verified: true
 Embedded VC 1 verified: true
+G. Privacy preserving continuation: selective disclosure and ZKP-style proof
 ```
 
 The DID values will be different on each machine.
@@ -303,4 +304,144 @@ Then run again:
 
 ```bash
 npm run start
+```
+
+## G. Selective Disclosure And Zero-Knowledge Proofs
+
+The root `example.ts` keeps the same lecture flow and ends with a small educational privacy continuation.
+
+It does not use a Veramo selective disclosure plugin. It shows the idea with plain TypeScript objects so students can understand the concept first.
+
+For the real Veramo plugin version, open:
+
+```text
+selective-disclosure/example.ts
+```
+
+Run it with:
+
+```bash
+npm run start:selective-disclosure
+```
+
+### Concrete Recruiter Requirement
+
+The recruiter is hiring for this role:
+
+```text
+Junior Blockchain / SSI Engineer
+```
+
+The recruiter only needs these fields:
+
+```ts
+claimsRequested: ['id', 'fullName', 'degreeName', 'degreeClass', 'graduationDate']
+```
+
+Alice does not reveal these fields:
+
+```ts
+claimsNotRequested: [
+  'birthDate',
+  'birthPlace',
+  'enrollmentDate',
+  'academicYear',
+  'curriculum',
+  'normalDuration',
+  'finalGrade',
+  'diplomaIssueDate',
+]
+```
+
+### Teaching Selective Disclosure Packet
+
+Alice sends only this smaller job-application packet:
+
+```ts
+revealedClaims: {
+  id: degreeClaims.id,
+  fullName: 'Alice Rossi',
+  degreeName: 'Laurea Magistrale in Informatica',
+  degreeClass: 'LM-18',
+  graduationDate: '2026-10-11',
+}
+```
+
+The code prints this concrete check:
+
+```ts
+{
+  onlyRequestedClaimsRevealed: true,
+  degreeClassAccepted: true,
+  degreeNameAccepted: true,
+  graduationDateAccepted: true,
+  verifierCanDecide: true,
+}
+```
+
+### Teaching Zero-Knowledge Predicate
+
+The recruiter asks:
+
+```text
+Prove finalGrade is at least 100/110 without revealing finalGrade.
+```
+
+Alice's hidden value is:
+
+```text
+finalGrade = 110/110 e lode
+```
+
+The recruiter learns only:
+
+```ts
+publicResult: true
+```
+
+The code prints:
+
+```ts
+{
+  predicateAccepted: true,
+  finalGradeWasNotRevealedInSelectiveDisclosure: true,
+  verifierAccepts: true,
+}
+```
+
+Important: this root example is a teaching mock. Real selective disclosure is in `selective-disclosure/`, and production zero-knowledge proof systems require real cryptographic protocols.
+
+## Real Veramo Selective Disclosure Plugin Example
+
+The plugin-based version is intentionally separate:
+
+```text
+selective-disclosure/
+```
+
+It uses:
+
+```ts
+new SelectiveDisclosure()
+new DataStoreORM(dbConnection)
+```
+
+It demonstrates these real Veramo plugin methods:
+
+```ts
+agent.createSelectiveDisclosureRequest(...)
+agent.getVerifiableCredentialsForSdr(...)
+agent.validatePresentationAgainstSdr(...)
+```
+
+Expected plugin summary:
+
+```ts
+{
+  requestJwtCreated: true,
+  requestedClaims: ['degreeClass', 'degreeName', 'graduationDate'],
+  matchingCredentialCounts: [1, 1, 1],
+  responseCredentialCount: 1,
+  presentationMatchesRequest: true,
+}
 ```
